@@ -1,0 +1,257 @@
+name: Vote Service CI/CD
+
+# ─────────────────────────────────────────────
+# Security best practice
+# ─────────────────────────────────────────────
+permissions:
+  contents: read
+
+# ─────────────────────────────────────────────
+# Concurrency: cancel older runs on new push
+# ─────────────────────────────────────────────
+concurrency:
+  group: vote-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# ─────────────────────────────────────────────
+# TRIGGER: Only when vote/** changes
+# ─────────────────────────────────────────────
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "vote/**"
+      - "k8s-specifications/**"
+      - ".github/workflows/vote-ci.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "vote/**"
+      - "k8s-specifications/**"
+      - ".github/workflows/vote-ci.yml"
+
+env:
+  IMAGE_NAME: ${{ secrets.DOCKER_USERNAME }}/vote
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  # ═══════════════════════════════════════════
+  # JOB 1: LINT
+  # ═══════════════════════════════════════════
+  lint:
+    name: Lint Code & Manifests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python linters
+        run: pip install flake8
+
+      - name: Lint vote/app.py with flake8
+        run: |
+          flake8 vote/app.py \
+            --max-line-length=120 \
+            --ignore=E501,W503 \
+            --statistics
+
+      - name: Install yamllint
+        run: pip install yamllint
+
+      - name: Lint Kubernetes manifests (yamllint)
+        run: |
+          yamllint -d "{extends: default, rules: {line-length: {max: 150}, truthy: {allowed-values: ['true', 'false']}}}" \
+            k8s-specifications/
+
+      # kubeconform: modern replacement for deprecated kubeval
+      - name: Install kubeconform
+        run: |
+          curl -sL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz \
+            | tar xz
+          sudo mv kubeconform /usr/local/bin/
+
+      - name: Validate K8s manifests with kubeconform
+        run: |
+          kubeconform \
+            -strict \
+            -ignore-missing-schemas \
+            -summary \
+            k8s-specifications/*.yaml
+
+  # ═══════════════════════════════════════════
+  # JOB 2: BUILD & PUSH
+  # ═══════════════════════════════════════════
+  build-and-push:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: lint
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push vote image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./vote
+          file: ./vote/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+            ${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Print pushed image
+        run: echo "✅ Pushed ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
+
+  # ═══════════════════════════════════════════
+  # JOB 3: INTEGRATION TEST
+  # ═══════════════════════════════════════════
+  integration-test:
+    name: Deploy & Smoke Test on Kind
+    runs-on: ubuntu-latest
+    needs: build-and-push
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create Kind cluster with port mappings
+        uses: helm/kind-action@v1.10.0
+        with:
+          cluster_name: vote-test-cluster
+          config: |
+            kind: Cluster
+            apiVersion: kind.x-k8s.io/v1alpha4
+            nodes:
+              - role: control-plane
+                extraPortMappings:
+                  - containerPort: 31000
+                    hostPort: 31000
+                    protocol: TCP
+                  - containerPort: 31001
+                    hostPort: 31001
+                    protocol: TCP
+
+      - name: Verify cluster is up
+        run: |
+          kubectl cluster-info
+          kubectl get nodes
+
+      # Patch vote image using kustomize-style sed — exact line match
+      - name: Patch vote image in deployment manifest
+        run: |
+          # Show before
+          echo "Before patch:"
+          grep "image:" k8s-specifications/vote-deployment.yaml
+
+          # Exact replacement — only the vote deployment image line
+          sed -i \
+            "s|image: dockersamples/examplevotingapp_vote.*|image: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}|" \
+            k8s-specifications/vote-deployment.yaml
+
+          # Show after — confirm patch worked
+          echo "After patch:"
+          grep "image:" k8s-specifications/vote-deployment.yaml
+
+      - name: Deploy all manifests
+        run: kubectl apply -f k8s-specifications/
+
+      # ── Wait for REQUIRED services (vote + redis) ──
+      # redis must be ready for vote to function
+      - name: Wait for redis
+        run: kubectl rollout status deployment/redis --timeout=90s
+
+      - name: Wait for vote deployment
+        run: kubectl rollout status deployment/vote --timeout=120s
+
+      # result and worker are best-effort — don't fail CI if they're slow
+      # (worker needs postgres which takes ~30s to initialize)
+      - name: Wait for result and worker (best-effort)
+        run: |
+          kubectl rollout status deployment/result --timeout=120s || \
+            echo "⚠️  result not ready yet — non-critical for smoke test"
+          kubectl rollout status deployment/worker --timeout=120s || \
+            echo "⚠️  worker not ready yet — depends on postgres init time"
+
+      - name: Show all pods
+        run: kubectl get pods -o wide
+
+      # ── Smoke Test: vote endpoint must return 200 + valid HTML ──
+      # Using -f flag: curl fails on HTTP 4xx/5xx
+      # Also checking response body contains "Cats" or "Dogs" (actual vote content)
+      - name: Smoke test — vote endpoint returns 200 OK with valid content
+        run: |
+          echo "⏳ Waiting 20s for services to stabilize..."
+          sleep 20
+
+          echo "Testing vote service..."
+
+          for i in $(seq 1 12); do
+            HTTP_CODE=$(curl -s -o /tmp/vote_response.html -w "%{http_code}" http://localhost:31000 || echo "000")
+            echo "Attempt $i — HTTP $HTTP_CODE"
+
+            if [ "$HTTP_CODE" = "200" ]; then
+              # -f flag: also verify response has actual vote page content
+              # grep for something that appears in the real vote app HTML
+              if grep -qi "cats\|dogs\|vote\|option" /tmp/vote_response.html; then
+                echo "✅ Smoke test PASSED — got 200 OK with valid vote page content"
+                exit 0
+              else
+                echo "⚠️  Got 200 but response content looks wrong:"
+                cat /tmp/vote_response.html | head -20
+              fi
+            fi
+
+            sleep 5
+          done
+
+          echo "❌ Smoke test FAILED"
+          echo ""
+          echo "=== Last response body ==="
+          cat /tmp/vote_response.html || true
+          echo ""
+          echo "=== Pod status ==="
+          kubectl get pods
+          echo ""
+          echo "=== Vote pod logs ==="
+          kubectl logs -l app=vote --tail=50 || true
+          echo ""
+          echo "=== Events ==="
+          kubectl get events --sort-by='.lastTimestamp' | tail -20
+
+          exit 1
+
+      - name: Debug logs (always run)
+        if: always()
+        run: |
+          echo "=== Final pod status ==="
+          kubectl get pods -o wide
+          echo ""
+          echo "=== Vote logs ==="
+          kubectl logs -l app=vote --tail=30 || true
+          echo ""
+          echo "=== Redis logs ==="
+          kubectl logs -l app=redis --tail=20 || true
+
+      - name: Cleanup Kind cluster
+        if: always()
+        run: kind delete cluster --name vote-test-cluster || true
