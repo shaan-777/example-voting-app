@@ -164,6 +164,17 @@ jobs:
       - name: Deploy all manifests
         run: kubectl apply -f k8s-specifications/
 
+      # ── Install NGINX Ingress Controller (kind-specific manifest) ──
+      - name: Install NGINX Ingress Controller
+        run: |
+          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+
+          kubectl wait \
+            --namespace ingress-nginx \
+            --for=condition=ready pod \
+            --selector=app.kubernetes.io/component=controller \
+            --timeout=180s
+
       # ── Wait for REQUIRED services (vote + redis) ──
       # redis must be ready for vote to function
       - name: Wait for redis
@@ -184,23 +195,24 @@ jobs:
       - name: Show all pods
         run: kubectl get pods -o wide
 
+      - name: Show ingress
+        run: kubectl get ingress -o wide
+
       # ── Smoke Test: vote endpoint must return 200 + valid HTML ──
-      # Using -f flag: curl fails on HTTP 4xx/5xx
-      # Also checking response body contains "Cats" or "Dogs" (actual vote content)
+      # Routed through NGINX Ingress using Host header (vote.local)
       - name: Smoke test — vote endpoint returns 200 OK with valid content
         run: |
           echo "⏳ Waiting 20s for services to stabilize..."
           sleep 20
 
-          echo "Testing vote service..."
+          echo "Testing vote service via Ingress..."
 
           for i in $(seq 1 12); do
-            HTTP_CODE=$(curl -s -o /tmp/vote_response.html -w "%{http_code}" http://localhost:31000 || echo "000")
+            HTTP_CODE=$(curl -H "Host: vote.local" -s -o /tmp/vote_response.html -w "%{http_code}" http://localhost || echo "000")
             echo "Attempt $i — HTTP $HTTP_CODE"
 
             if [ "$HTTP_CODE" = "200" ]; then
-              # -f flag: also verify response has actual vote page content
-              # grep for something that appears in the real vote app HTML
+              # also verify response has actual vote page content
               if grep -qi "cats\|dogs\|vote\|option" /tmp/vote_response.html; then
                 echo "✅ Smoke test PASSED — got 200 OK with valid vote page content"
                 exit 0
@@ -220,6 +232,12 @@ jobs:
           echo ""
           echo "=== Pod status ==="
           kubectl get pods
+          echo ""
+          echo "=== Ingress status ==="
+          kubectl get ingress -o wide
+          echo ""
+          echo "=== Ingress controller logs ==="
+          kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller --tail=50 || true
           echo ""
           echo "=== Vote pod logs ==="
           kubectl logs -l app=vote --tail=50 || true
