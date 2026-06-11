@@ -134,7 +134,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-            - name: Create Kind cluster with port mappings
+      - name: Create Kind cluster with port mappings
         uses: helm/kind-action@v1.10.0
         with:
           cluster_name: vote-test-cluster
