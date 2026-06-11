@@ -1,11 +1,11 @@
----
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   labels:
     app: db
   name: db
 spec:
+  serviceName: db
   replicas: 1
   selector:
     matchLabels:
@@ -18,17 +18,40 @@ spec:
       containers:
         - image: postgres:15-alpine
           name: postgres
-          env:
-            - name: POSTGRES_USER
-              value: postgres
-            - name: POSTGRES_PASSWORD
-              value: postgres
+          envFrom:
+            - secretRef:
+                name: db-credentials
           ports:
             - containerPort: 5432
               name: postgres
           volumeMounts:
             - mountPath: /var/lib/postgresql/data
               name: db-data
-      volumes:
-        - name: db-data
-          emptyDir: {}
+              subPath: postgres
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+  volumeClaimTemplates:
+    - metadata:
+        name: db-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
