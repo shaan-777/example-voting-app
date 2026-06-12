@@ -1,4 +1,4 @@
-# Example Voting App – Kubernetes Deployment with CI/CD
+<!-- # Example Voting App – Kubernetes Deployment with CI/CD
 
 ## Overview
 
@@ -380,3 +380,107 @@ The voting application only accepts one vote per client browser. It does not reg
 This isn't an example of a properly architected perfectly designed distributed app... it's just a simple
 example of the various types of pieces and languages you might see (queues, persistent data, etc), and how to
 deal with them in Docker at a basic level.
+
+## What Changed and Why
+
+The original application was enhanced with Kubernetes production-oriented improvements:
+
+* Migrated PostgreSQL to a StatefulSet for persistent identity and storage.
+* Added Persistent Volume Claims (PVCs) to retain database data across pod restarts.
+* Added Kubernetes Secrets for database credentials.
+* Added resource requests and limits for all workloads.
+* Added readiness and liveness probes where supported by container images.
+* Added NGINX Ingress for host-based routing.
+* Implemented GitHub Actions CI/CD pipeline.
+* Added Kind-based integration testing and smoke tests.
+* Added a bootstrap deployment script for one-command deployment.
+
+## Troubleshooting
+
+### Pods are not starting
+
+Check pod status:
+
+```bash
+kubectl get pods
+kubectl describe pod <pod-name>
+```
+
+### View application logs
+
+```bash
+kubectl logs deployment/vote
+kubectl logs deployment/result
+kubectl logs deployment/worker
+```
+
+### Ingress not accessible
+
+```bash
+kubectl get ingress
+kubectl describe ingress voting-app-ingress
+```
+
+Verify hosts file contains:
+
+```text
+127.0.0.1 vote.local result.local
+```
+
+### Database issues
+
+```bash
+kubectl logs statefulset/db
+```
+
+## Trade-offs
+
+* Kind was used for local Kubernetes testing instead of a managed cloud cluster.
+* Docker Hub was used as the container registry for simplicity.
+* The deployment process uses a lightweight bootstrap script rather than Helm.
+* The worker service does not currently use a liveness probe because the upstream image lacks the utilities required for reliable process inspection.
+
+## Video Walkthrough
+
+Video Link: ADD_VIDEO_LINK_HERE -->
+
+
+
+# Example Voting App – Kubernetes Deployment with CI/CD
+
+## Overview
+
+This project deploys the Docker Example Voting Application on Kubernetes with production-oriented improvements including:
+
+* Kubernetes Deployments
+* PostgreSQL StatefulSet
+* Persistent Volume Claims (PVC)
+* Kubernetes Secrets
+* Resource Requests and Limits
+* Health Checks (Liveness & Readiness Probes)
+* NGINX Ingress
+* GitHub Actions CI/CD Pipeline
+* Docker Image Build & Push
+* Automated Integration Testing using Kind
+* Smoke Testing
+* Single-command Bootstrap Deployment
+
+This is based on the [Docker Example Voting App](https://github.com/dockersamples/example-voting-app) — a simple distributed app with a Python (Flask) vote frontend, a Redis queue, a .NET worker, a Postgres database, and a Node.js result frontend. The original app only accepts one vote per client browser and is intentionally simple — it's a demo of how these pieces (queues, persistent data, multiple languages) fit together in containers, now extended for Kubernetes.
+
+---
+
+## Architecture
+
+![Architecture diagram](architecture.excalidraw.png)
+
+Application Components:
+
+* Vote Service (Frontend, Python/Flask)
+* Redis Queue
+* Worker Service (.NET)
+* PostgreSQL Database
+* Result Service (Frontend, Node.js)
+
+Workflow:
+
+```text
