@@ -269,6 +269,9 @@ kubectl describe ingress voting-app-ingress
 <img width="1469" height="468" alt="Screenshot 2026-06-12 at 17 29 35" src="https://github.com/user-attachments/assets/b73bbec4-de57-4885-981f-a7aa3a557f6b" />
 
 
+<img width="1470" height="597" alt="Screenshot 2026-06-12 at 17 39 36" src="https://github.com/user-attachments/assets/1ba619a5-1ca9-48ba-b316-a3ce98447046" />
+
+
 View workflow runs:
 
 ```bash
