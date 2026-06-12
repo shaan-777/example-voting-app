@@ -1,3 +1,320 @@
+# Example Voting App – Kubernetes Deployment with CI/CD
+
+## Overview
+
+This project deploys the Docker Example Voting Application on Kubernetes with production-oriented improvements including:
+
+* Kubernetes Deployments
+* PostgreSQL StatefulSet
+* Persistent Volume Claims (PVC)
+* Kubernetes Secrets
+* Resource Requests and Limits
+* Health Checks (Liveness & Readiness Probes)
+* NGINX Ingress
+* GitHub Actions CI/CD Pipeline
+* Docker Image Build & Push
+* Automated Integration Testing using Kind
+* Smoke Testing
+* Single-command Bootstrap Deployment
+
+---
+
+## Architecture
+
+Application Components:
+
+* Vote Service (Frontend)
+* Redis Queue
+* Worker Service
+* PostgreSQL Database
+* Result Service (Frontend)
+
+Workflow:
+
+```text
+User
+  │
+  ▼
+Vote Service
+  │
+  ▼
+Redis
+  │
+  ▼
+Worker
+  │
+  ▼
+PostgreSQL
+  │
+  ▼
+Result Service
+```
+
+---
+
+## Kubernetes Resources
+
+### Deployments
+
+* vote
+* result
+* redis
+* worker
+
+### StatefulSet
+
+* db (PostgreSQL)
+
+### Services
+
+* vote
+* result
+* redis
+* db
+
+### Storage
+
+* Persistent Volume Claim (PVC)
+* Persistent Database Storage
+
+### Secrets
+
+* Database Credentials stored in Kubernetes Secret
+
+### Ingress
+
+Hosts:
+
+* vote.local
+* result.local
+
+---
+
+## Resource Management
+
+All workloads use resource requests and limits.
+
+Example:
+
+```yaml
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi
+```
+
+---
+
+## Health Checks
+
+Liveness and readiness probes are configured for application services where supported by the container image.
+
+Examples include:
+
+* Vote Service
+* Result Service
+* Redis
+* PostgreSQL
+
+---
+
+## CI/CD Pipeline
+
+GitHub Actions workflow performs:
+
+### 1. Linting
+
+* flake8
+* yamllint
+* kubeconform
+
+### 2. Build
+
+* Docker image build
+* Docker image push to Docker Hub
+
+### 3. Integration Testing
+
+Creates a Kind cluster and:
+
+* Deploys Kubernetes manifests
+* Waits for workloads
+* Deploys Ingress Controller
+* Executes smoke tests
+
+### 4. Smoke Testing
+
+Validates:
+
+* Vote service accessibility
+* HTTP 200 response
+* Valid application content
+
+---
+
+## Prerequisites
+
+Install:
+
+* Docker
+* kubectl
+* Kind
+* Git
+
+---
+
+## Local Deployment
+
+### Clone Repository
+
+```bash
+git clone https://github.com/shaan-777/example-voting-app.git
+cd example-voting-app
+```
+
+### Configure Hosts
+
+Add the following entry:
+
+```text
+127.0.0.1 vote.local result.local
+```
+
+Mac/Linux:
+
+```bash
+sudo nano /etc/hosts
+```
+
+---
+
+## Deploy Application
+
+Single command deployment:
+
+```bash
+chmod +x bootstrap.sh
+./bootstrap.sh
+```
+
+This script:
+
+* Applies all manifests
+* Waits for deployments
+* Verifies rollout completion
+
+---
+
+## Verify Deployment
+
+```bash
+kubectl get pods
+```
+
+```bash
+kubectl get svc
+```
+
+```bash
+kubectl get ingress
+```
+
+---
+
+## Access Application
+
+Vote Application:
+
+```text
+http://vote.local
+```
+
+Results Application:
+
+```text
+http://result.local
+```
+
+---
+
+## Database Verification
+
+List tables:
+
+```bash
+kubectl exec -it db-0 -- psql -U postgres -c "\dt"
+```
+
+---
+
+## Useful Commands
+
+View Pods:
+
+```bash
+kubectl get pods
+```
+
+View Logs:
+
+```bash
+kubectl logs deployment/vote
+
+kubectl logs deployment/result
+
+kubectl logs deployment/worker
+```
+
+Follow Worker Logs:
+
+```bash
+kubectl logs deployment/worker -f
+```
+
+Check Ingress:
+
+```bash
+kubectl describe ingress voting-app-ingress
+```
+
+---
+
+## CI/CD Validation
+
+View workflow runs:
+
+```bash
+gh run list --repo shaan-777/example-voting-app
+```
+
+---
+
+## Project Features Completed
+
+* Kubernetes Deployments
+* PostgreSQL StatefulSet
+* Persistent Storage
+* Kubernetes Secrets
+* Resource Limits
+* Health Checks
+* Ingress Routing
+* Docker Image Build
+* GitHub Actions CI/CD
+* Kind Integration Testing
+* Smoke Testing
+* Bootstrap Deployment Script
+
+---
+
+## Author
+
+Krith Thakker
+
+GitHub:
+https://github.com/shaan-777
 # Example Voting App
 
 A simple distributed application running across multiple Docker containers.
