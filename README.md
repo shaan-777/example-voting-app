@@ -442,7 +442,8 @@ kubectl logs statefulset/db
 
 ## Video Walkthrough
 
-Video Link: ADD_VIDEO_LINK_HERE -->
+Video Link: https://www.loom.com/share/2102ea099a1a494b9812ae2e9e996ad3
+-->
 
 
 
