@@ -166,6 +166,12 @@ Install:
 
 ## Local Deployment
 
+<img width="1331" height="841" alt="Screenshot 2026-06-12 at 17 31 08" src="https://github.com/user-attachments/assets/46bdbbc7-1fc7-4e1f-947b-580984bac378" />
+<img width="1299" height="808" alt="Screenshot 2026-06-12 at 17 31 00" src="https://github.com/user-attachments/assets/0676976e-d114-4fb1-821d-1085217a210c" />
+<img width="1279" height="811" alt="Screenshot 2026-06-12 at 17 30 49" src="https://github.com/user-attachments/assets/b3ab1fc7-276b-40e6-abdb-a2ffc8e77056" />
+<img width="1330" height="785" alt="Screenshot 2026-06-12 at 17 30 36" src="https://github.com/user-attachments/assets/ef2c3aff-1989-4ebc-ab5f-1b13f3fd056d" />
+
+
 ### 1. Clone Repository
 
 ```bash
