@@ -1,452 +1,3 @@
-<!-- # Example Voting App – Kubernetes Deployment with CI/CD
-
-## Overview
-
-This project deploys the Docker Example Voting Application on Kubernetes with production-oriented improvements including:
-
-* Kubernetes Deployments
-* PostgreSQL StatefulSet
-* Persistent Volume Claims (PVC)
-* Kubernetes Secrets
-* Resource Requests and Limits
-* Health Checks (Liveness & Readiness Probes)
-* NGINX Ingress
-* GitHub Actions CI/CD Pipeline
-* Docker Image Build & Push
-* Automated Integration Testing using Kind
-* Smoke Testing
-* Single-command Bootstrap Deployment
-
----
-
-## Architecture
-
-Application Components:
-
-* Vote Service (Frontend)
-* Redis Queue
-* Worker Service
-* PostgreSQL Database
-* Result Service (Frontend)
-
-Workflow:
-
-```text
-User
-  │
-  ▼
-Vote Service
-  │
-  ▼
-Redis
-  │
-  ▼
-Worker
-  │
-  ▼
-PostgreSQL
-  │
-  ▼
-Result Service
-```
-
----
-
-## Kubernetes Resources
-
-### Deployments
-
-* vote
-* result
-* redis
-* worker
-
-### StatefulSet
-
-* db (PostgreSQL)
-
-### Services
-
-* vote
-* result
-* redis
-* db
-
-### Storage
-
-* Persistent Volume Claim (PVC)
-* Persistent Database Storage
-
-### Secrets
-
-* Database Credentials stored in Kubernetes Secret
-
-### Ingress
-
-Hosts:
-
-* vote.local
-* result.local
-
----
-
-## Resource Management
-
-All workloads use resource requests and limits.
-
-Example:
-
-```yaml
-resources:
-  requests:
-    cpu: 100m
-    memory: 128Mi
-  limits:
-    cpu: 250m
-    memory: 256Mi
-```
-
----
-
-## Health Checks
-
-Liveness and readiness probes are configured for application services where supported by the container image.
-
-Examples include:
-
-* Vote Service
-* Result Service
-* Redis
-* PostgreSQL
-
----
-
-## CI/CD Pipeline
-
-GitHub Actions workflow performs:
-
-### 1. Linting
-
-* flake8
-* yamllint
-* kubeconform
-
-### 2. Build
-
-* Docker image build
-* Docker image push to Docker Hub
-
-### 3. Integration Testing
-
-Creates a Kind cluster and:
-
-* Deploys Kubernetes manifests
-* Waits for workloads
-* Deploys Ingress Controller
-* Executes smoke tests
-
-### 4. Smoke Testing
-
-Validates:
-
-* Vote service accessibility
-* HTTP 200 response
-* Valid application content
-
----
-
-## Prerequisites
-
-Install:
-
-* Docker
-* kubectl
-* Kind
-* Git
-
----
-
-## Local Deployment
-
-### Clone Repository
-
-```bash
-git clone https://github.com/shaan-777/example-voting-app.git
-cd example-voting-app
-```
-
-### Configure Hosts
-
-Add the following entry:
-
-```text
-127.0.0.1 vote.local result.local
-```
-
-Mac/Linux:
-
-```bash
-sudo nano /etc/hosts
-```
-
----
-
-## Deploy Application
-
-Single command deployment:
-
-```bash
-chmod +x bootstrap.sh
-./bootstrap.sh
-```
-
-This script:
-
-* Applies all manifests
-* Waits for deployments
-* Verifies rollout completion
-
----
-
-## Verify Deployment
-
-```bash
-kubectl get pods
-```
-
-```bash
-kubectl get svc
-```
-
-```bash
-kubectl get ingress
-```
-
----
-
-## Access Application
-
-Vote Application:
-
-```text
-http://vote.local
-```
-
-Results Application:
-
-```text
-http://result.local
-```
-
----
-
-## Database Verification
-
-List tables:
-
-```bash
-kubectl exec -it db-0 -- psql -U postgres -c "\dt"
-```
-
----
-
-## Useful Commands
-
-View Pods:
-
-```bash
-kubectl get pods
-```
-
-View Logs:
-
-```bash
-kubectl logs deployment/vote
-
-kubectl logs deployment/result
-
-kubectl logs deployment/worker
-```
-
-Follow Worker Logs:
-
-```bash
-kubectl logs deployment/worker -f
-```
-
-Check Ingress:
-
-```bash
-kubectl describe ingress voting-app-ingress
-```
-
----
-
-## CI/CD Validation
-
-View workflow runs:
-
-```bash
-gh run list --repo shaan-777/example-voting-app
-```
-
----
-
-## Project Features Completed
-
-* Kubernetes Deployments
-* PostgreSQL StatefulSet
-* Persistent Storage
-* Kubernetes Secrets
-* Resource Limits
-* Health Checks
-* Ingress Routing
-* Docker Image Build
-* GitHub Actions CI/CD
-* Kind Integration Testing
-* Smoke Testing
-* Bootstrap Deployment Script
-
----
-
-## Author
-
-Krith Thakker
-
-GitHub:
-https://github.com/shaan-777
-# Example Voting App
-
-A simple distributed application running across multiple Docker containers.
-
-## Getting started
-
-Download [Docker Desktop](https://www.docker.com/products/docker-desktop) for Mac or Windows. [Docker Compose](https://docs.docker.com/compose) will be automatically installed. On Linux, make sure you have the latest version of [Compose](https://docs.docker.com/compose/install/).
-
-This solution uses Python, Node.js, .NET, with Redis for messaging and Postgres for storage.
-
-Run in this directory to build and run the app:
-
-```shell
-docker compose up
-```
-
-The `vote` app will be running at [http://localhost:8080](http://localhost:8080), and the `results` will be at [http://localhost:8081](http://localhost:8081).
-
-Alternately, if you want to run it on a [Docker Swarm](https://docs.docker.com/engine/swarm/), first make sure you have a swarm. If you don't, run:
-
-```shell
-docker swarm init
-```
-
-Once you have your swarm, in this directory run:
-
-```shell
-docker stack deploy --compose-file docker-stack.yml vote
-```
-
-## Run the app in Kubernetes
-
-The folder k8s-specifications contains the YAML specifications of the Voting App's services.
-
-Run the following command to create the deployments and services. Note it will create these resources in your current namespace (`default` if you haven't changed it.)
-
-```shell
-kubectl create -f k8s-specifications/
-```
-
-The `vote` web app is then available on port 31000 on each host of the cluster, the `result` web app is available on port 31001.
-
-To remove them, run:
-
-```shell
-kubectl delete -f k8s-specifications/
-```
-
-## Architecture
-
-![Architecture diagram](architecture.excalidraw.png)
-
-* A front-end web app in [Python](/vote) which lets you vote between two options
-* A [Redis](https://hub.docker.com/_/redis/) which collects new votes
-* A [.NET](/worker/) worker which consumes votes and stores them in…
-* A [Postgres](https://hub.docker.com/_/postgres/) database backed by a Docker volume
-* A [Node.js](/result) web app which shows the results of the voting in real time
-
-## Notes
-
-The voting application only accepts one vote per client browser. It does not register additional votes if a vote has already been submitted from a client.
-
-This isn't an example of a properly architected perfectly designed distributed app... it's just a simple
-example of the various types of pieces and languages you might see (queues, persistent data, etc), and how to
-deal with them in Docker at a basic level.
-
-## What Changed and Why
-
-The original application was enhanced with Kubernetes production-oriented improvements:
-
-* Migrated PostgreSQL to a StatefulSet for persistent identity and storage.
-* Added Persistent Volume Claims (PVCs) to retain database data across pod restarts.
-* Added Kubernetes Secrets for database credentials.
-* Added resource requests and limits for all workloads.
-* Added readiness and liveness probes where supported by container images.
-* Added NGINX Ingress for host-based routing.
-* Implemented GitHub Actions CI/CD pipeline.
-* Added Kind-based integration testing and smoke tests.
-* Added a bootstrap deployment script for one-command deployment.
-
-## Troubleshooting
-
-### Pods are not starting
-
-Check pod status:
-
-```bash
-kubectl get pods
-kubectl describe pod <pod-name>
-```
-
-### View application logs
-
-```bash
-kubectl logs deployment/vote
-kubectl logs deployment/result
-kubectl logs deployment/worker
-```
-
-### Ingress not accessible
-
-```bash
-kubectl get ingress
-kubectl describe ingress voting-app-ingress
-```
-
-Verify hosts file contains:
-
-```text
-127.0.0.1 vote.local result.local
-```
-
-### Database issues
-
-```bash
-kubectl logs statefulset/db
-```
-
-## Trade-offs
-
-* Kind was used for local Kubernetes testing instead of a managed cloud cluster.
-* Docker Hub was used as the container registry for simplicity.
-* The deployment process uses a lightweight bootstrap script rather than Helm.
-* The worker service does not currently use a liveness probe because the upstream image lacks the utilities required for reliable process inspection.
-
-## Video Walkthrough
-
-Video Link: https://www.loom.com/share/2102ea099a1a494b9812ae2e9e996ad3
--->
-
-
-
 # Example Voting App – Kubernetes Deployment with CI/CD
 
 ## Overview
@@ -485,3 +36,301 @@ Application Components:
 Workflow:
 
 ```text
+User
+  │
+  ▼
+Vote Service
+  │
+  ▼
+Redis
+  │
+  ▼
+Worker
+  │
+  ▼
+PostgreSQL
+  │
+  ▼
+Result Service
+```
+
+---
+
+## What Changed and Why
+
+The original manifests were enhanced with the following production-oriented improvements:
+
+* **Migrated PostgreSQL to a StatefulSet** with a PersistentVolumeClaim — ensures stable network identity and that vote data survives pod restarts/rescheduling, instead of using `emptyDir` (which is wiped on pod recreation).
+* **Added a Kubernetes Secret (`db-credentials`)** for Postgres username/password/db name — removed plaintext credentials from the deployment YAML.
+* **Added resource requests and limits** on every workload (vote, result, redis, worker, db) — prevents any one pod from starving others on the node.
+* **Added readiness and liveness probes** on every workload where the container image supports it (HTTP probes for vote/result, TCP probe for redis, `pg_isready` exec probe for Postgres).
+* **Replaced NodePort with NGINX Ingress** for `vote` and `result` — host-based routing (`vote.local`, `result.local`) instead of fixed high-numbered ports, closer to how a real cluster would expose services.
+* **Built a GitHub Actions CI/CD pipeline** scoped to the `vote` service: lint → build & push to Docker Hub → spin up an ephemeral Kind cluster → deploy → install ingress-nginx → smoke test via Ingress.
+* **Added a bootstrap script** (`bootstrap.sh`) for one-command local deployment.
+
+---
+
+## Kubernetes Resources
+
+### Deployments
+* vote
+* result
+* redis
+* worker
+
+### StatefulSet
+* db (PostgreSQL)
+
+### Services
+* vote
+* result
+* redis
+* db (headless, for the StatefulSet)
+
+### Storage
+* PersistentVolumeClaim for PostgreSQL data (via `volumeClaimTemplates`)
+
+### Secrets
+* `db-credentials` — Postgres username, password, and database name
+
+### Ingress
+Hosts:
+* `vote.local` → vote service
+* `result.local` → result service
+
+---
+
+## Resource Management
+
+All workloads define resource requests and limits. Example:
+
+```yaml
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi
+```
+
+---
+
+## Health Checks
+
+Liveness and readiness probes are configured for every workload, using the most appropriate probe type for each:
+
+* **Vote / Result** — HTTP `GET /` probes
+* **Redis** — TCP socket probe on port 6379
+* **PostgreSQL** — `pg_isready` exec probe
+* **Worker** — process-presence exec probe for liveness (see Trade-offs — the worker image has no HTTP/TCP health endpoint)
+
+---
+
+## CI/CD Pipeline
+
+GitHub Actions workflow (`.github/workflows/vote-ci.yml`), triggered on changes to `vote/**`, `k8s-specifications/**`, or the workflow file itself:
+
+### 1. Lint
+* `flake8` on `vote/app.py`
+* `yamllint` on `k8s-specifications/`
+* `kubeconform` for K8s manifest schema validation
+
+### 2. Build & Push
+* Builds the vote Docker image
+* Pushes to Docker Hub, tagged with both `latest` and the commit SHA
+
+### 3. Integration Test (on Kind)
+* Spins up a fresh Kind cluster with port mappings to the host
+* Patches the vote deployment to use the freshly-built image
+* Applies all manifests
+* Installs the NGINX Ingress Controller and waits for it to be ready
+* Waits for redis and vote rollouts (required); result/worker are best-effort
+
+### 4. Smoke Test
+* Sends a request through the Ingress (`Host: vote.local`) to the mapped local port
+* Verifies HTTP 200 and that the response contains real vote page content (`Cats`/`Dogs`/`Vote`/`Option`)
+* On failure, dumps pod status, ingress status, ingress-controller logs, vote pod logs, and recent events for debugging
+
+---
+
+## Prerequisites
+
+Install:
+* Docker
+* kubectl
+* Kind
+* Git
+
+---
+
+## Local Deployment
+
+### 1. Clone Repository
+
+```bash
+git clone https://github.com/shaan-777/example-voting-app.git
+cd example-voting-app
+```
+
+### 2. Configure Hosts
+
+Add the following entry to your hosts file:
+
+```text
+127.0.0.1 vote.local result.local
+```
+
+Mac/Linux:
+
+```bash
+sudo nano /etc/hosts
+```
+
+### 3. Deploy
+
+Single command deployment:
+
+```bash
+chmod +x bootstrap.sh
+./bootstrap.sh
+```
+
+This script:
+* Creates/uses a local Kind cluster (named `vote-test-cluster`)
+* Installs the NGINX Ingress Controller
+* Applies all manifests
+* Waits for all deployments and the StatefulSet to roll out
+
+### 4. Verify Deployment
+
+```bash
+kubectl get pods
+kubectl get svc
+kubectl get ingress
+kubectl get statefulset
+kubectl get pvc
+kubectl get secret
+```
+
+### 5. Access the Application
+
+* Vote app: http://vote.local:8080
+* Results app: http://result.local:8080
+
+> Note: port `8080`/`8443` (instead of the default `80`/`443`) is used for the Kind cluster's host port mappings, since Docker Desktop on macOS often binds port 80 for its own internal proxy. If port 80 is free on your machine, you can change `hostPort` back to `80`/`443` in `.github/kind-config.yaml` and drop the `:8080` from the URLs above.
+
+Cast a vote in the vote app, then refresh the result app — your vote should appear within a few seconds.
+
+### Database Verification
+
+List tables:
+
+```bash
+kubectl exec -it db-0 -- psql -U postgres -c "\dt"
+```
+
+---
+
+## Useful Commands
+
+View pods:
+```bash
+kubectl get pods
+```
+
+View logs:
+```bash
+kubectl logs deployment/vote
+kubectl logs deployment/result
+kubectl logs deployment/worker
+```
+
+Follow worker logs:
+```bash
+kubectl logs deployment/worker -f
+```
+
+Check ingress:
+```bash
+kubectl describe ingress voting-app-ingress
+```
+
+---
+
+## CI/CD Validation
+
+View workflow runs:
+
+```bash
+gh run list --repo shaan-777/example-voting-app
+```
+
+---
+
+## Troubleshooting
+
+### Pods are not starting
+
+```bash
+kubectl get pods
+kubectl describe pod <pod-name>
+```
+
+Common causes: image pull errors, resource limits too low for the node, or a failing readiness/liveness probe causing repeated restarts. Check `kubectl describe pod` events and `kubectl logs <pod-name>`.
+
+### A vote doesn't reach the result app
+
+This usually means one of the links in the chain (vote → redis → worker → db → result) is broken.
+
+1. Check redis is up and the vote pod can reach it: `kubectl logs deployment/vote`
+2. Check the worker is consuming votes: `kubectl logs deployment/worker -f` — it should print a row insert on each new vote.
+3. Check Postgres is reachable and has data: `kubectl exec -it db-0 -- psql -U postgres -c "select * from votes;"`
+4. If the worker pod is stuck `CrashLoopBackOff`, it's likely Postgres wasn't ready yet when the worker started — the worker has no retry/backoff logic in the original image, so restarting the worker pod (`kubectl delete pod -l app=worker`) after `db-0` is ready usually fixes it.
+
+### Ingress not accessible / 404 or connection refused on vote.local
+
+```bash
+kubectl get ingress
+kubectl describe ingress voting-app-ingress
+kubectl get pods -n ingress-nginx
+```
+
+* Confirm `/etc/hosts` has `127.0.0.1 vote.local result.local`.
+* Confirm the ingress-nginx controller pod is `Running` and `Ready` — it can take 30-60s after install for the admission webhook to register, during which routing requests may briefly fail.
+* Confirm `kubectl get ingress -o wide` shows an address and that the `vote`/`result` services are listed as backends.
+* Confirm you're using the correct port in the URL (`:8080`/`:8443` if using the default config in this repo).
+
+### Port 80/443 already in use when creating the Kind cluster
+
+```
+Bind for 0.0.0.0:80 failed: port is already allocated
+```
+
+This means something on your machine (often Docker Desktop's own proxy on macOS) is already using port 80. Either stop that process, or use the `8080`/`8443` host port mapping already configured in `.github/kind-config.yaml` (and access the app via `:8080` as shown above).
+
+---
+
+## Trade-offs
+
+* **Kind** was used for local/CI Kubernetes instead of a managed cloud cluster — keeps everything free and runnable on a laptop or GitHub-hosted runner, at the cost of not testing cloud-specific networking/storage.
+* **Docker Hub** was used as the container registry for simplicity over GHCR.
+* Deployment uses a lightweight **bootstrap script** rather than Helm/Kustomize — faster to get working end-to-end, but less reusable across environments (no separate dev/staging values).
+* **Host ports 8080/8443** are used instead of 80/443 for the Kind cluster, to avoid a common conflict with Docker Desktop's internal proxy on macOS.
+* The **worker** has no HTTP/TCP health endpoint in the upstream image, so its liveness probe is a basic process-presence check rather than a true application health check — a custom worker image with a `/healthz` endpoint would be more reliable.
+* **Redis** uses `emptyDir` storage (acceptable since it's just a queue, not a system of record) rather than a PVC.
+* With more time: add Network Policies (only vote→redis, only worker→db), a HorizontalPodAutoscaler on vote, and a Helm chart with per-environment values files.
+
+---
+
+## Video Walkthrough
+
+Video Link: https://www.loom.com/share/2102ea099a1a494b9812ae2e9e996ad3
+
+---
+
+## Author
+
+Krith Thakker
+
+GitHub: https://github.com/shaan-777
